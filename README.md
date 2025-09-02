@@ -7,18 +7,19 @@ Este projeto é uma estação meteorológica simples baseada no **ESP32** com se
 - Medição de **temperatura** e **umidade** com DHT11.
 - Detecção de **chuva** via sensor analógico.
 - LEDs indicativos: 
-  - **Vermelho** acende quando a temperatura está acima de 28,5°C.
+  - **Vermelho** acende quando a temperatura está acima de 28.00 °C.
   - **Verde** indica temperatura normal.
+  - **Vermelho** e **Verde** piscando simultâneos indica presença de chuva.
 - **Buzzer** dispara sinal sonoro quando a temperatura ultrapassa o limite.
 - **Tela OLED** exibindo:
   - Cabeçalho centralizado.
   - Dados de temperatura, umidade e chuva.
-  - Tela de alerta com temperatura em fonte maior e indicação de chuva no rodapé.
+  - Tela de alerta com temperatura em fonte maior e indicação de chuva no rodapé (Caso a temperatura seja elevada e chova no local ).
 - Publicação dos dados nos tópicos MQTT:
   - `temp` → temperatura
   - `umid` → umidade
   - `chuva` → status de chuva
-- LEDs piscam quando chuva detectada.
+- LEDs piscam simultâneos quando chuva detectada.
 
 ## Hardware Utilizado
 
@@ -43,4 +44,4 @@ Este projeto é uma estação meteorológica simples baseada no **ESP32** com se
 
 ---
 
-Feito como projeto escolar, destinado a demonstração de sensores, MQTT e visualização em display OLED.
+Feito como projeto para faculdade Nova Roma / Recife , destinado a demonstração de sensores, MQTT e visualização em display OLED à turma de Analise de Sistemas.
