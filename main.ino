@@ -9,17 +9,18 @@
   Hardware usado:
     Microcontrolador Esp32
     Sensor de temperatura e umidade DHT11
-    módulo de detecção de precipitação ( Raindrop)
+    módulo de detecção de precipitação (Raindrop)
     Leds vermelho e verde
-    Resistores 220 ohms
+    Resistores: 2x 220 ohms | 1x 10k ohms
     Buzzer
-
+    Placa solar 2V 160mA (sensor de insolação)
 */
-// Bibliotecas necessárias:
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include <U8g2_for_Adafruit_GFX.h>
 #include <DHT.h>
 
 // Hardware:
@@ -31,14 +32,17 @@ DHT dht(DHTPIN, DHTTYPE);
 #define LED_VERMELHO 16
 #define BUZZER 2
 #define CHUVA_PIN 34
+#define SOLAR_PIN 33   // Placa solar no ADC1 (GPIO33)
 
+// Display
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;  // Adaptador de fontes
 
 // WiFi: Credenciais
-const char* ssid = "ssid de seu wifi aqui";
-const char* password = "coloque a senha de seu wifi aqui";
+const char* ssid = "insira aqui sua wifi-ssid";
+const char* password = "insira aqui a senha do seu wifi";
 
 // Dados do MQTT:
 const char* mqtt_server = "broker.hivemq.com";
@@ -47,6 +51,7 @@ const char* clientID = "cangaco_01";
 const char* topicChuva = "est_01/chuva";
 const char* topicTemp = "est_01/temp";
 const char* topicUmid = "est_01/umid";
+const char* topicSolar = "est_01/solar";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -62,10 +67,8 @@ void connectWifi() {
   WiFi.begin(ssid, password);
 
   display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("Conectando WiFi...");
+  u8g2Fonts.setCursor(0, 12);
+  u8g2Fonts.print("Conectando WiFi...");
   display.display();
 
   while (WiFi.status() != WL_CONNECTED) {
@@ -78,11 +81,12 @@ void connectWifi() {
   Serial.println(WiFi.localIP());
 
   display.clearDisplay();
-  display.setCursor(0, 0);
-  display.println("WiFi conectado!");
+  u8g2Fonts.setCursor(0, 12);
+  u8g2Fonts.print("WiFi conectado!");
   display.display();
   delay(1000);
 }
+
 // Reconecta MQTT:
 void reconnectMQTT() {
   while (!client.connected()) {
@@ -98,50 +102,61 @@ void reconnectMQTT() {
 }
 
 // Exibição no display:
-void drawNormalScreen(float temp, float umid, bool chovendo) {
+void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
   display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
 
-  display.setCursor((SCREEN_WIDTH - 7 * 15) / 2, 0);
-  display.println("Estacao Cangaceiros");
+  u8g2Fonts.setCursor(16, 12);
+  u8g2Fonts.print("Estacao Cangaceiros");
 
-  display.setCursor(0, 16);
-  display.print("WiFi: ");
-  display.println(WiFi.localIP());
+  u8g2Fonts.setCursor(0, 28);
+  u8g2Fonts.print("WiFi: ");
+  u8g2Fonts.print(WiFi.localIP());
 
-  display.print("Temp: ");
-  display.print(temp);
-  display.println(" C");
+  u8g2Fonts.setCursor(0, 40);
+  u8g2Fonts.print("Temp: ");
+  u8g2Fonts.print(temp);
+  u8g2Fonts.print(" C");
 
-  display.print("Umid: ");
-  display.print(umid);
-  display.println(" %");
+  u8g2Fonts.setCursor(0, 52);
+  u8g2Fonts.print("Umid: ");
+  u8g2Fonts.print(umid);
+  u8g2Fonts.print(" %");
 
-  display.print("Chuva: ");
-  display.println(chovendo ? "Sim" : "Nao");
+  u8g2Fonts.setCursor(0, 64);
+  u8g2Fonts.print("Chuva: ");
+  u8g2Fonts.print(chovendo ? "Sim" : "Nao");
+
+  u8g2Fonts.setCursor(80, 52);
+  u8g2Fonts.print("Sol: ");
+  u8g2Fonts.print(insolacao, 0);
+  u8g2Fonts.print("%");
 
   display.display();
 }
 
 // Exibição alerta:
-void drawAlertScreen(float temp, bool chovendo) {
+void drawAlertScreen(float temp, bool chovendo, float insolacao) {
   display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
 
-  display.setTextSize(1);
-  display.setCursor((SCREEN_WIDTH - 7 * 15) / 2, 0);
-  display.println("Estacao Cangaceiros");
+  u8g2Fonts.setCursor(16, 12);
+  u8g2Fonts.print("Estacao Cangaceiros");
 
-  display.setTextSize(2);
-  display.setCursor(20, 24);
-  display.print(temp);
-  display.print(" C");
+  u8g2Fonts.setCursor(20, 36);
+  u8g2Fonts.print("ALERTA!");
+  
+  u8g2Fonts.setCursor(0, 48);
+  u8g2Fonts.print("Temp: ");
+  u8g2Fonts.print(temp);
+  u8g2Fonts.print(" C");
 
-  display.setTextSize(1);
-  display.setCursor(0, SCREEN_HEIGHT - 10); // rodapé
-  display.print("Chuva: ");
-  display.println(chovendo ? "Sim" : "Nao");
+  u8g2Fonts.setCursor(0, 60);
+  u8g2Fonts.print("Chuva: ");
+  u8g2Fonts.print(chovendo ? "Sim" : "Nao");
+
+  u8g2Fonts.setCursor(80, 60);
+  u8g2Fonts.print("Sol: ");
+  u8g2Fonts.print(insolacao, 0);
+  u8g2Fonts.print("%");
 
   display.display();
 }
@@ -151,6 +166,7 @@ void setup() {
   pinMode(LED_VERDE, OUTPUT);
   pinMode(LED_VERMELHO, OUTPUT);
   pinMode(BUZZER, OUTPUT);
+  pinMode(SOLAR_PIN, INPUT);
 
   digitalWrite(LED_VERDE, LOW);
   digitalWrite(LED_VERMELHO, LOW);
@@ -162,6 +178,9 @@ void setup() {
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     for (;;);
   }
+
+  u8g2Fonts.begin(display);  
+  u8g2Fonts.setFont(u8g2_font_helvR08_tr);
 
   connectWifi();
   client.setServer(mqtt_server, mqtt_port);
@@ -183,21 +202,33 @@ void loop() {
     int chuvaVal = analogRead(CHUVA_PIN);
     bool chovendo = chuvaVal < 2000;
 
+    // Leitura da placa solar
+    int leituraSolar = analogRead(SOLAR_PIN);
+    float tensaoSolar = (leituraSolar / 4095.0) * 3.3; 
+    float insolacaoPercent = (tensaoSolar / 2.0) * 100.0;
+    if (insolacaoPercent > 100) insolacaoPercent = 100;
+
     Serial.print("[SENSOR] Temp: ");
     Serial.print(temp);
     Serial.print(" C, Umid: ");
     Serial.print(umid);
     Serial.print("%, Chuva: ");
-    Serial.println(chovendo ? "Sim" : "Nao");
+    Serial.print(chovendo ? "Sim" : "Nao");
+    Serial.print(", Solar: ");
+    Serial.print(tensaoSolar);
+    Serial.print(" V (");
+    Serial.print(insolacaoPercent, 0);
+    Serial.println("%)");
 
-    // Publicaões no MQTT:
+    // Publicações no MQTT:
     if (!isnan(temp) && !isnan(umid)) {
       client.publish(topicTemp, String(temp).c_str());
       client.publish(topicUmid, String(umid).c_str());
       Serial.println("[MQTT] Temperatura e Umidade publicadas");
     }
     client.publish(topicChuva, chovendo ? "Chovendo" : "Sem chuva");
-    Serial.println("[MQTT] Chuva publicada");
+    client.publish(topicSolar, String(insolacaoPercent, 0).c_str());
+    Serial.println("[MQTT] Chuva e Insolacao publicadas");
 
     // Controle de temperatura:
     if (temp > TEMP_LIMITE) {
@@ -230,11 +261,11 @@ void loop() {
       delay(200);
     }
 
-    // Display (alerta):
+    // Display:
     if (alertaTemperatura) {
-      drawAlertScreen(temp, chovendo);
+      drawAlertScreen(temp, chovendo, insolacaoPercent);
     } else {
-      drawNormalScreen(temp, umid, chovendo);
+      drawNormalScreen(temp, umid, chovendo, insolacaoPercent);
     }
   }
 }
