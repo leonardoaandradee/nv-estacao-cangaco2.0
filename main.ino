@@ -1,5 +1,8 @@
 /* 
-  Projeto Estação Meteorológica Cangaceiros
+  Faculdade Nova Roma - Recife / PE / BRasil
+  Sistemas Embarcados - 02.2025
+
+  Projeto: Estação Meteorológica Cangaceiros
   Equipe:
     Eduardo Cadiz
     Larissa Beatriz
@@ -16,6 +19,7 @@
     Placa solar 2V 160mA (sensor de insolação)
 */
 
+// Bibliotecas:
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Adafruit_GFX.h>
@@ -40,8 +44,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 
 // WiFi: Credenciais
-const char* ssid = "xxxxxxxxxxxxxxx";
-const char* password = "xxxxxxxxxxxxxx";
+const char* ssid = "**********";
+const char* password = "*********";
 
 // Dados do MQTT:
 const char* mqtt_server = "broker.hivemq.com";
@@ -62,7 +66,44 @@ unsigned long lastMsg = 0;
 bool alertaTemperatura = false;
 
 // Funções:
-void connectWifi() {
+// Tela de boas-vindas
+void showWelcomeScreen() {
+  display.clearDisplay();
+  u8g2Fonts.setFont(u8g2_font_helvR08_tr);
+  
+  // Mensagem boas vindas:
+  const char* linha1 = "Estacao Meteorologica";
+  const char* linha2 = "Cangaceiros";
+  const char* linha3 = "est_01";
+  
+  int16_t x, y;
+  uint16_t w, h;
+  
+  // Altura vertical do display:
+  int alturaTotalTexto = 36; 
+  int y_pos = (SCREEN_HEIGHT - alturaTotalTexto) / 2;
+  
+  // Centraliza e imprime linha 1
+  display.getTextBounds(linha1, 0, 0, &x, &y, &w, &h);
+  u8g2Fonts.setCursor((SCREEN_WIDTH - w) / 2, y_pos);
+  u8g2Fonts.print(linha1);
+  
+  // Centraliza e imprime linha 2
+  display.getTextBounds(linha2, 0, 0, &x, &y, &w, &h);
+  u8g2Fonts.setCursor((SCREEN_WIDTH - w) / 2, y_pos + 14);
+  u8g2Fonts.print(linha2);
+  
+  // Centraliza e imprime linha 3
+  display.getTextBounds(linha3, 0, 0, &x, &y, &w, &h);
+  u8g2Fonts.setCursor((SCREEN_WIDTH - w) / 2, y_pos + 28);
+  u8g2Fonts.print(linha3);
+  
+  display.display();
+  delay(5000); 
+}
+
+// Conexão WiFi:
+bool connectWifi() {
   Serial.println("[INFO] Conectando ao WiFi...");
   WiFi.begin(ssid, password);
 
@@ -72,7 +113,7 @@ void connectWifi() {
   display.display();
 
   int tentativas = 0;
-  int maxTentativas = 20;
+  int maxTentativas = 60;
   while (WiFi.status() != WL_CONNECTED && tentativas < maxTentativas) {
     Serial.print(".");
     int barraLargura = map(tentativas, 0, maxTentativas, 0, SCREEN_WIDTH-10);
@@ -84,14 +125,27 @@ void connectWifi() {
   }
 
   Serial.println();
-  Serial.print("[INFO] WiFi conectado. IP: ");
-  Serial.println(WiFi.localIP());
-
-  display.clearDisplay();
-  u8g2Fonts.setCursor(0, 12);
-  u8g2Fonts.print("WiFi conectado!");
-  display.display();
-  delay(1000);
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[INFO] WiFi conectado. IP: ");
+    Serial.println(WiFi.localIP());
+    
+    display.clearDisplay();
+    u8g2Fonts.setCursor(0, 12);
+    u8g2Fonts.print("WiFi conectado!");
+    display.display();
+    delay(1000);
+    return true;
+  } else {
+    Serial.println("[ERRO] Falha na conexão WiFi!");
+    
+    display.clearDisplay();
+    u8g2Fonts.setCursor(0, 12);
+    u8g2Fonts.print("WiFi: falha conexao");
+    display.display();
+    delay(1000);
+    return false;
+  }
 }
 
 // Reconecta MQTT:
@@ -117,13 +171,17 @@ void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
   uint16_t w_cab, h_cab;
   display.getTextBounds(cabecalho, 0, 0, &x_cab, &y_cab, &w_cab, &h_cab);
   int x_central = (SCREEN_WIDTH - w_cab) / 2;
-  u8g2Fonts.setCursor(x_central, 12);
+  u8g2Fonts.setCursor((x_central+8), 12);
   u8g2Fonts.print(cabecalho);
 
   u8g2Fonts.setFont(u8g2_font_helvR08_tr);
   u8g2Fonts.setCursor(0, 28);
   u8g2Fonts.print("WiFi: ");
-  u8g2Fonts.print(WiFi.localIP());
+  if (WiFi.status() == WL_CONNECTED) {
+    u8g2Fonts.print(WiFi.localIP());
+  } else {
+    u8g2Fonts.print("nao conectado");
+  }
 
   u8g2Fonts.setCursor(0, 40);
   u8g2Fonts.print("Temp: ");
@@ -140,7 +198,7 @@ void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
   u8g2Fonts.print(chovendo ? "Sim" : "Nao");
 
   u8g2Fonts.setCursor(80, 52);
-  u8g2Fonts.print("Sol: ");
+  u8g2Fonts.print("Luz: ");
   u8g2Fonts.print(insolacao, 0);
   u8g2Fonts.print("%");
 
@@ -150,40 +208,43 @@ void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
 // Exibição alerta:
 void drawAlertScreen(float temp, bool chovendo, float insolacao) {
   display.clearDisplay();
-  const char* cabecalho = "Estacao Cangaceiros";
-  u8g2Fonts.setFont(u8g2_font_helvR08_tr);
-  int16_t x_cab, y_cab;
-  uint16_t w_cab, h_cab;
-  display.getTextBounds(cabecalho, 0, 0, &x_cab, &y_cab, &w_cab, &h_cab);
-  int x_central = (SCREEN_WIDTH - w_cab) / 2;
-  u8g2Fonts.setCursor(x_central, 12);
-  u8g2Fonts.print(cabecalho);
+  
+  // Centralizar  verticalmente
+  int alturaTotalTexto = 36;
+  int y_pos_inicial = (SCREEN_HEIGHT - alturaTotalTexto) / 2;
 
-
-  // Mensagem ALERTA:
+  // Mensagem ALERTA centralizada horizontal e verticalmente
   u8g2Fonts.setFont(u8g2_font_fub14_tr);
   const char* alerta = "ALERTA";
   int16_t x_alert, y_alert;
   uint16_t w_alert, h_alert;
   display.getTextBounds(alerta, 0, 0, &x_alert, &y_alert, &w_alert, &h_alert);
   int x_alerta = (SCREEN_WIDTH - w_alert) / 2;
-  u8g2Fonts.setCursor(x_alerta, 36);
+
+  u8g2Fonts.setCursor((x_alerta/2), y_pos_inicial);
+
   u8g2Fonts.print(alerta);
 
-  u8g2Fonts.setFont(u8g2_font_helvR08_tr);
-  u8g2Fonts.setCursor(0, 60);
-  u8g2Fonts.print("Temp: ");
-  u8g2Fonts.print(temp);
-  u8g2Fonts.print(" C");
+  // Exibe temperatura centralizada com mesmo tamanho de fonte:
+  char temp_str[20];
+  sprintf(temp_str, "%.1f oC", temp);
+  display.getTextBounds(temp_str, 0, 0, &x_alert, &y_alert, &w_alert, &h_alert);
+  int x_temp = (SCREEN_WIDTH - w_alert) / 2;
+  u8g2Fonts.setCursor((x_temp/1.5), y_pos_inicial + 20);
+  u8g2Fonts.print(temp_str);
 
-  u8g2Fonts.setCursor(80, 60);
+  // Volta para fonte normal para informações adicionais
+  u8g2Fonts.setFont(u8g2_font_helvR08_tr);
+  
+  // Informações na parte inferior da tela
+  u8g2Fonts.setCursor(0, SCREEN_HEIGHT - 8);
+  u8g2Fonts.print("Chuva: ");
+  u8g2Fonts.print(chovendo ? "Sim" : "Nao");
+
+  u8g2Fonts.setCursor(80, SCREEN_HEIGHT - 8);
   u8g2Fonts.print("Sol: ");
   u8g2Fonts.print(insolacao, 0);
   u8g2Fonts.print("%");
-
-  u8g2Fonts.setCursor(0, 72);
-  u8g2Fonts.print("Chuva: ");
-  u8g2Fonts.print(chovendo ? "Sim" : "Nao");
 
   display.display();
 }
@@ -209,7 +270,13 @@ void setup() {
   u8g2Fonts.begin(display);  
   u8g2Fonts.setFont(u8g2_font_helvR08_tr);
 
-  connectWifi();
+  // Tela de boas-vindas:
+  showWelcomeScreen();
+  
+  // Conecta WiFi com timeout de 15 segundos:
+  bool wifiConnected = connectWifi();
+  
+  // Continua mesmo se o WiFi não conectar:
   client.setServer(mqtt_server, mqtt_port);
 }
 
@@ -265,11 +332,10 @@ void loop() {
       digitalWrite(LED_VERMELHO, HIGH);
       digitalWrite(LED_VERDE, LOW);
       alertaTemperatura = true;
-
       Serial.println("[ALERTA] Temperatura acima do limite!");
       // Publica alerta no MQTT (apenas 'on'):
       client.publish(topicAlerta, "on");
-      // Beep no buzzer:
+      // Beep no buzzer: 
       digitalWrite(BUZZER, HIGH);
       delay(100);
       digitalWrite(BUZZER, LOW);
