@@ -28,8 +28,8 @@ Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;
 
 // WiFi: Credenciais
-const char* ssid = "ANDROMEDA";
-const char* password = "22602260";
+const char* ssid = "**********"; // <- set your SSID here
+const char* password = "**********"; // <- Set your WIFI password here
 
 // Dados do MQTT:
 const char* mqtt_server = "broker.hivemq.com";
@@ -50,23 +50,23 @@ const float TEMP_LIMITE = 25.00;
 unsigned long lastMsg = 0;
 bool alertaTemperatura = false;
 
-// NTP para timestamp
+// NTP para timestamp:
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -3 * 3600; // fuso horário de Brasília
+const long gmtOffset_sec = -3 * 3600; // <- fuso horário de Brasília
 const int daylightOffset_sec = 0;
 
-// Funções auxiliares
+// Funções auxiliares:
 String getTimeStamp() {
   time_t now;
   struct tm timeinfo;
   if (!getLocalTime(&timeinfo)) {
-    return "0"; // fallback
+    return "0";
   }
   time(&now);
   return String((unsigned long)now);
 }
 
-// Tela de boas-vindas
+// Tela de boas-vindas:
 void showWelcomeScreen() {
   display.clearDisplay();
   u8g2Fonts.setFont(u8g2_font_helvR08_tr);
@@ -115,7 +115,7 @@ void reconnectMQTT() {
   }
 }
 
-// Exibição normal
+// Exibição normal:
 void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
   display.clearDisplay();
   const char* cabecalho = "Estacao Cangaceiros";
@@ -139,21 +139,21 @@ void drawNormalScreen(float temp, float umid, bool chovendo, float insolacao) {
   display.display();
 }
 
-// Exibição alerta
+// Exibição alerta:
 void drawAlertScreen(float temp, bool chovendo, float insolacao) {
   display.clearDisplay();
   u8g2Fonts.setFont(u8g2_font_fub14_tr);
   const char* alerta = "ALERTA";
-  u8g2Fonts.setCursor(20, 20);
+  u8g2Fonts.setCursor(25, 14);
   u8g2Fonts.print(alerta);
   char temp_str[20];
   sprintf(temp_str, "%.1f oC", temp);
-  u8g2Fonts.setCursor(20, 40);
+  u8g2Fonts.setCursor(28, 40);
   u8g2Fonts.print(temp_str);
   u8g2Fonts.setFont(u8g2_font_helvR08_tr);
-  u8g2Fonts.setCursor(0, SCREEN_HEIGHT - 8);
+  u8g2Fonts.setCursor(5, SCREEN_HEIGHT - 6);
   u8g2Fonts.print("Chuva: "); u8g2Fonts.print(chovendo ? "Sim" : "Nao");
-  u8g2Fonts.setCursor(80, SCREEN_HEIGHT - 8);
+  u8g2Fonts.setCursor(80, SCREEN_HEIGHT - 6);
   u8g2Fonts.print("Sol: "); u8g2Fonts.print(insolacao, 0); u8g2Fonts.print("%");
   display.display();
 }
