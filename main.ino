@@ -21,7 +21,8 @@
 
 
 // Bibliotecas:
-const dados = $json.message;
+
+/*const dados = $json.message;
 
 https://estacao-1a951-default-rtdb.firebaseio.com/{{ $json.path }}.json
 put{
@@ -39,7 +40,7 @@ return [
       }
     }
   }
-];
+];*/
 
 
 #include <WiFi.h>
