@@ -19,7 +19,29 @@
     Placa solar 2V 160mA (sensor de insolação)
 */
 
+
 // Bibliotecas:
+const dados = $json.message;
+
+https://estacao-1a951-default-rtdb.firebaseio.com/{{ $json.path }}.json
+put{
+return [
+  {
+    json: {
+      path: dados/,
+      body: {
+        temperatura: Number(dados.temperatura),
+        umidade: Number(dados.umidade),
+        indice_solar: Number(dados.indice_solar),
+        chuva: (dados.chuva === "Sem chuva" || dados.chuva === 0) ? 0 : 1,
+        alerta: (dados.alerta === "on" || dados.alerta === true),
+        timestamp: ts
+      }
+    }
+  }
+];
+
+
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <Adafruit_GFX.h>
