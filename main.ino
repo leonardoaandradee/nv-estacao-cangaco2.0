@@ -58,7 +58,9 @@ DHT dht(DHTPIN, DHTTYPE);
 #define LED_VERMELHO 16
 #define BUZZER 2
 #define CHUVA_PIN 34
-#define SOLAR_PIN 33  
+#define SOLAR_PIN 33
+#define CHANNEL_ID 3148680 //ID do Thinkspeak
+
 
 // Display:
 #define SCREEN_WIDTH 128
@@ -71,9 +73,15 @@ const char* ssid = "**********";
 const char* password = "*********";
 
 // Dados do MQTT:
-const char* mqtt_server = "broker.hivemq.com";
+const char* mqtt_server = "mqtt.thingspeak.com";
 const int mqtt_port = 1883;
-const char* clientID = "cangaco_01";
+const char* clientID = "Estacao_Cangaceiros"; 
+
+// Chave do Thinkspeak
+const char* mqtt_user = "apikey";  
+const char* mqtt_pass = "IBQBU0RUTVIV87JL";  
+
+
 const char* topicChuva = "est_01/chuva";
 const char* topicTemp = "est_01/temp";
 const char* topicUmid = "est_01/umid";
@@ -175,7 +183,7 @@ bool connectWifi() {
 void reconnectMQTT() {
   while (!client.connected()) {
     Serial.println("[INFO] Conectando ao broker MQTT...");
-    if (client.connect(clientID)) {
+    if (client.connect(clientID, mqtt_user, mqtt_pass)) {
       Serial.println("[INFO] MQTT conectado!");
     } else {
       Serial.print("[ERRO] Falha MQTT, rc=");
@@ -341,14 +349,25 @@ void loop() {
     Serial.println("%)");
 
     // Publicações no MQTT:
-    if (!isnan(temp) && !isnan(umid)) {
-      client.publish(topicTemp, String(temp).c_str());
-      client.publish(topicUmid, String(umid).c_str());
-      Serial.println("[MQTT] Temperatura e Umidade publicadas");
-    }
-    client.publish(topicChuva, chovendo ? "Chovendo" : "Sem chuva");
-    client.publish(topicSolar, String(insolacaoPercent, 0).c_str());
-    Serial.println("[MQTT] Chuva e Insolacao publicadas");
+  // Publicações no MQTT:
+if (!isnan(temp) && !isnan(umid)) {
+  // Monta o payload com todos os campos do canal
+  String payload = "field1=" + String(temp, 1) +  // Temperatura
+                   "&field2=" + String(umid, 1) +  // Umidade
+                   "&field3=" + String(insolacaoPercent, 0) +  // Luz 
+                   "&field4=" + String(chovendo ? 1 : 0);      // Chuva (1=Sim, 0=Não)
+
+  // Monta o tópico do canal ThingSpeak corretamente
+  String topic = "channels/" + String(CHANNEL_ID) + "/publish";
+
+  // Publica no canal
+  client.publish(topic.c_str(), payload.c_str());
+
+  Serial.println("[ThingSpeak] Dados enviados:");
+  Serial.println(payload);
+}
+
+
 
     // Controle de temperatura:
     if (temp > TEMP_LIMITE) {
